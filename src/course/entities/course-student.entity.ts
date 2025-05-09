@@ -5,6 +5,7 @@ import {
   Unique,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 import { Course } from './course.entity';
@@ -12,6 +13,7 @@ import { Student } from '../../student/entities/student.entity';
 
 @Entity()
 @Unique(['course', 'student'])
+@Index('IDX_STUDENT', ['student'])
 export class CourseStudent {
   @PrimaryGeneratedColumn('uuid')
   id: string;

@@ -19,6 +19,9 @@ import { validateErrors } from '../utils';
 
 @Injectable()
 export class CourseService {
+  private diversityCache: Map<string, { value: number; timestamp: number }>;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutos en milisegundos
+
   constructor(
     @InjectRepository(Course)
     private readonly courseRepository: Repository<Course>,
@@ -28,7 +31,9 @@ export class CourseService {
 
     @InjectRepository(CourseStudent)
     private readonly courseStudentRepository: Repository<CourseStudent>,
-  ) {}
+  ) {
+    this.diversityCache = new Map();
+  }
 
   async create(createCourseDto: CreateCourseDto) {
     try {
@@ -72,6 +77,13 @@ export class CourseService {
     if (!course) throw new NotFoundException('Curso no encontrado');
 
     return course;
+  }
+
+  async findOneWithDiversity(id: string) {
+    const course = await this.findOne(id);
+    const diversity = await this.getDomainDiversityFromCache(id);
+
+    return { ...course, domainDiversity: diversity };
   }
 
   async update(id: string, updateCourseDto: UpdateCourseDto) {
@@ -128,6 +140,7 @@ export class CourseService {
     });
 
     await this.courseStudentRepository.save(newEntry);
+    this.invalidateCache(courseId);
 
     return { ok: true, message: 'Estudiante agregado al curso con éxito' };
   }
@@ -164,6 +177,7 @@ export class CourseService {
       throw new NotFoundException('No se encontro un estudiante en el curso');
 
     await this.courseStudentRepository.remove(relation);
+    this.invalidateCache(courseId);
 
     return { ok: true, message: 'Estudiante eliminado del curso' };
   }
@@ -194,5 +208,27 @@ export class CourseService {
         : 0;
 
     return diversity;
+  }
+
+  private async getDomainDiversityFromCache(courseId: string): Promise<number> {
+    const now = Date.now();
+    const cached = this.diversityCache.get(courseId);
+
+    // Si existe en caché y no ha expirado, retornarlo
+    if (cached && now - cached.timestamp < this.CACHE_TTL) {
+      console.log(`[Cache HIT] Usando valor cacheado para curso ${courseId}`);
+      return cached.value;
+    }
+
+    // Si no existe o expiró, calcularlo y guardarlo en caché
+    console.log(`[Cache MISS] Calculando diversidad para curso ${courseId}`);
+    const diversity = await this.calculateDomainDiversity(courseId);
+    this.diversityCache.set(courseId, { value: diversity, timestamp: now });
+    return diversity;
+  }
+
+  private invalidateCache(courseId: string) {
+    console.log(`[Cache INVALIDATE] Invalidando caché para curso ${courseId}`);
+    this.diversityCache.delete(courseId);
   }
 }

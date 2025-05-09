@@ -36,6 +36,11 @@ export class CourseController {
     return this.courseService.getStudentsFromCourse(courseId);
   }
 
+  @Get('diversity/:id')
+  findOneWithDiversity(@Param('id', ParseUUIDPipe) id: string) {
+    return this.courseService.findOneWithDiversity(id);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.courseService.findOne(id);
